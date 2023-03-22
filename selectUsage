@@ -1,0 +1,73 @@
+  <select id="selectUsage" resultMap="BaseResultMap">
+    select 
+	    <include refid="Usage_Data_Base_Sum_List" />
+      <if test="startDate != null and endDate != null">
+        year_month
+        from (select
+        <include refid="Usage_Data_Base_List" />
+      </if>     
+      to_char(target_at <include refid="Add_Step_Time" />, <include refid="Year_Month_Get" />
+
+    from r_user_usage
+    where user_id = #{userId,jdbcType=INTEGER}
+    <if test="year != null">
+      and date_part('year', target_at) = #{year}
+    </if>
+    <if test="month != null">
+      and date_part('month', target_at) = #{month}
+    </if>
+    <if test="startDate != null">
+      and target_at <![CDATA[ >= ]]> #{startDate}::date
+    </if>
+    <if test="endDate != null">
+      and target_at <![CDATA[ <= ]]> #{endDate}::date
+    </if>
+    <if test="startDate != null and endDate != null">
+      union all
+      select
+        0 as corrected_sheet_count,
+		    0 as verified_sheet_count,
+		    0 as checked_sheet_count,
+		    0 as corrected_field_count,
+		    0 as verified_field_count,
+		    0 as checked_field_count,
+		    0 as un_chosen_verified_field_count,
+        0 as average_hours_count,
+        <choose>
+          <when test="unit != null and unit == 0">
+            to_char(generate_series((SELECT date_trunc('YEAR', #{startDate}:: timestamp)), 
+                  (SELECT date_trunc('YEAR', #{endDate}::timestamp) + interval '1 YEAR - 1 DAY'),
+                  make_interval(
+                  years
+          </when> <!-- for bug fix #108275 miss month for new account -->
+          <when test="unit == null or unit == 1">
+            to_char(generate_series((SELECT date_trunc('MONTH', #{startDate}:: timestamp)), 
+                   (SELECT date_trunc('MONTH', #{endDate}::timestamp) + interval '1 MONTH - 1 DAY'),
+                   make_interval(
+                   months
+          </when>
+          <when test="unit != null and unit == 2">
+            to_char(generate_series(#{startDate}::timestamp, #{endDate}::timestamp, make_interval(
+            days
+          </when>
+        </choose>
+        =>
+	      <choose>
+	        <when test="step == null">
+	          1
+	        </when>     
+	        <otherwise>
+	          #{step}
+	        </otherwise>
+	      </choose>
+	      )), <include refid="Year_Month_Get" />) usage_table
+    </if>
+    Group by year_month
+    ORDER by year_month DESC
+    <if test="limit != null">
+      limit #{limit}
+    </if>
+    <if test="offset != null">
+      offset #{offset}
+    </if>
+  </select>

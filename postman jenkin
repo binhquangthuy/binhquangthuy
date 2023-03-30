@@ -1,0 +1,61 @@
+
+----------------------------------------------------------------------------------------------------------------------
+postman:
+
+[ -d /home/recaius/UT/Result/UT_14823/ ] || mkdir -p /home/recaius/UT/Result/UT_14823/
+
+/home/recaius/.npm/bin/newman run "/home/recaius/UT/#14823/#14823 - 10686.postman_collection.json" \
+-e "/home/recaius/UT/ENVIROMENT_UT.postman_environment.json" \
+--working-dir "/home/recaius/UT/file_upload_data" \
+--disable-unicode --reporters cli,htmlextra \
+--reporter-htmlextra-export "/home/recaius/UT/Result/UT_14823/14823-10686.html"
+
+--------------------------------------------------------------------------------------------------------------------
+coverage
+
+pipeline {
+    agent any
+    
+    environment {
+        PATH_EXECUTE_EXPORT_COVERAGE_ENTRY = '/home/recaius/work/data_config_build/ocr_entry_api'
+        PATH_RESULT_COVERAGE = '/home/recaius/work/data_config_build/result_coverage'
+    }
+    
+    stages {
+        stage('Export coverage') {
+            steps {
+                script {
+                    if (env.EXPORT != null || env.EXPORT != '') {
+                        this.processLogicalExportCoverage(env.EXPORT)
+                    }
+                }
+            }
+        }
+    }
+}
+
+void processLogicalExportCoverage(def container) {
+    // finter container exist by name
+    def containerId = sh( script: 'docker container ls -q --filter name=' + container, returnStdout: true )
+
+    if(containerId != null && containerId != "") { 
+        dir(env.PATH_EXECUTE_EXPORT_COVERAGE_ENTRY) {
+            sh './export_coverage_ocr_entry_api.sh ' + container
+        }
+        
+        sleep(5)
+        
+        def path = env.PATH_EXECUTE_EXPORT_COVERAGE_ENTRY  + '/data/coverage/' + container
+
+        sh 'java -jar /home/recaius/work/data_config_build/jar-file/jacoco/jacococli.jar report ' + path + '/result_coverage.exec ' + '--classfiles ' + path + '/classes/java ' + '--sourcefiles ' + path + '/main/java ' + '--html ' + env.PATH_RESULT_COVERAGE + '/' + env.NAME_EXPORT
+
+        def pathResult = env.PATH_RESULT_COVERAGE + '/' + env.NAME_EXPORT + '.zip'
+        if (fileExists(pathResult)) {
+            sh 'rm -rf ' + pathResult
+        }
+        
+        sh 'zip -r ' + pathResult + ' ' + env.PATH_RESULT_COVERAGE + '/' + env.NAME_EXPORT
+        
+        sh 'rm -rf ' + env.PATH_RESULT_COVERAGE + '/' + env.NAME_EXPORT
+    }
+}
